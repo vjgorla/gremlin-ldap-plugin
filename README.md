@@ -12,7 +12,7 @@ authentication: {
    authenticationHandler: org.apache.tinkerpop.gremlin.server.handler.HttpBasicAuthenticationHandler,
    config: {
      ldapCtxFactory: com.sun.jndi.ldap.LdapCtxFactory,
-     ldapProviderUrl: "ldap://myldaphost:636",
+     ldapProviderUrl: "ldaps://myldaphost:636",
      ldapSecurityProtocol: ssl,
      ldapSecurityAuth: simple,
      ldapBindAccountDn: "cn=myserverbindaccount,ou=users,dc=xyz,dc=com",
