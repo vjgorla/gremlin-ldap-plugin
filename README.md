@@ -20,7 +20,7 @@ authentication: {
      ldapUserRootDn: "ou=users,dc=xyz,dc=com",
      # User must belong to the group below to succussfully authenticate
      ldapAuthorisedGroupDn: "cn=my_gremlin_users,ou=groups,dc=xyz,dc=com"
-     # Cache hashed credentials for 30 mins before revalidating with LDAP. While cached, credentials are only checked locally to improve performance. Setting this value effectively removes this optimisation and goes to LDAP for every request.
+     # Cache hashed credentials for 30 mins before revalidating with LDAP. While cached, credentials are only checked locally to improve performance. Setting this value to zero effectively removes the optimisation and goes to LDAP for every request.
      credentialCacheTtlMins: 30
    }
 }
