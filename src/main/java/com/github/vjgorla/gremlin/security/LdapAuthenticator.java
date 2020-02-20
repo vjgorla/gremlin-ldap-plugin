@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import javax.naming.Context;
 import javax.naming.NamingEnumeration;
@@ -21,8 +22,12 @@ import javax.naming.ldap.LdapContext;
 import org.apache.tinkerpop.gremlin.server.auth.AuthenticatedUser;
 import org.apache.tinkerpop.gremlin.server.auth.AuthenticationException;
 import org.apache.tinkerpop.gremlin.server.auth.Authenticator;
+import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 
 /**
  *
@@ -42,8 +47,11 @@ public class LdapAuthenticator implements Authenticator {
         String LDAP_BIND_ACCOUNT_PASSWORD = "ldapBindAccountPassword";
         String LDAP_USER_ROOT_DN = "ldapUserRootDn";
         String LDAP_AUTHORISED_GROUP_DN = "ldapAuthorisedGroupDn";
+        String CREDENTIAL_CACHE_TTL_MINS = "credentialCacheTtlMins";
     }
 
+    private Cache<String, String> cache;
+    private int credentialCacheTtlMins;
     private Hashtable<String, String> ldapEnv;
     private String ldapBindAccountDn;
     private String ldapBindAccountPassword;
@@ -76,6 +84,12 @@ public class LdapAuthenticator implements Authenticator {
 
         this.ldapUserRootDn = getConfigValue(config, ConfigKeys.LDAP_USER_ROOT_DN); 
         this.ldapAuthorisedGroupDn = getConfigValue(config, ConfigKeys.LDAP_AUTHORISED_GROUP_DN);   
+        
+        this.credentialCacheTtlMins = getConfigValue(config, ConfigKeys.CREDENTIAL_CACHE_TTL_MINS);
+        this.cache = CacheBuilder.newBuilder()
+			       .maximumSize(5000)
+			       .expireAfterWrite(this.credentialCacheTtlMins, TimeUnit.MINUTES)
+			       .build();
     }
 
     @Override
@@ -83,6 +97,7 @@ public class LdapAuthenticator implements Authenticator {
         return new PlainTextSaslAuthenticator();
     }
 
+    @Override
     public AuthenticatedUser authenticate(final Map<String, String> credentials) throws AuthenticationException {
         if (!credentials.containsKey(PROPERTY_USERNAME)) throw new IllegalArgumentException(String.format("Credentials must contain a %s", PROPERTY_USERNAME));
         if (!credentials.containsKey(PROPERTY_PASSWORD)) throw new IllegalArgumentException(String.format("Credentials must contain a %s", PROPERTY_PASSWORD));
@@ -90,6 +105,22 @@ public class LdapAuthenticator implements Authenticator {
         final String username = credentials.get(PROPERTY_USERNAME);
         final String password = credentials.get(PROPERTY_PASSWORD);
         
+        String cachedPwdHash = this.cache.getIfPresent(username);
+        if (cachedPwdHash != null) {
+        	if (!BCrypt.checkpw(password, cachedPwdHash)) {
+        		throw new AuthenticationException("Username and/or password are incorrect");
+        	}
+        } else {
+        	this.ldapAuthenticate(username, password);
+        	// Successful. Store hashed password in cache to improve performance
+        	String pwdHash = BCrypt.hashpw(password, BCrypt.gensalt(4));
+        	this.cache.put(username, pwdHash);
+        }
+
+        return new AuthenticatedUser(username);
+    }
+    
+    private void ldapAuthenticate(String username, String password) throws AuthenticationException {
         String userDn = "uid=" + username + "," + this.ldapUserRootDn;
         logger.debug("Authenticating user {} using LDAP", username);
         
@@ -109,8 +140,7 @@ public class LdapAuthenticator implements Authenticator {
         if (!isAuthorised) {
             logger.debug("User {} does not belong to authorised group {}", userDn, this.ldapAuthorisedGroupDn);
             throw new AuthenticationException("User does not belong to authorised group");
-        }
-        return new AuthenticatedUser(username);
+        }    	
     }
     
     private boolean isAuthorised(String userDn) throws AuthenticationException {
@@ -140,8 +170,9 @@ public class LdapAuthenticator implements Authenticator {
         return new InitialLdapContext(authLdapEnv, null);
     }
     
-    private static String getConfigValue(final Map<String,Object> config, String key) {
-        String value = (String)config.get(key);
+    @SuppressWarnings("unchecked")
+	private static <T> T getConfigValue(final Map<String,Object> config, String key) {
+        T value = (T)config.get(key);
         if (value == null) {
             throw new IllegalStateException(String.format("Authentication configuration missing the %s key", key));
         }
