@@ -29,26 +29,26 @@ import org.slf4j.LoggerFactory;
  * @author Vijaya Gorla
  */
 public class LdapAuthenticator implements Authenticator {
-	
+    
     private static final Logger logger = LoggerFactory.getLogger(LdapAuthenticator.class);
     private static final byte NUL = 0;
     
     interface ConfigKeys {
-    	String LDAP_INITIAL_CONTEXT_FACTORY = "ldapCtxFactory";
-    	String LDAP_PROVIDER_URL = "ldapProviderUrl";
-    	String LDAP_SECURITY_PROTOCOL = "ldapSecurityProtocol";
-    	String LDAP_SECURITY_AUTHENTICATION = "ldapSecurityAuth";
+        String LDAP_INITIAL_CONTEXT_FACTORY = "ldapCtxFactory";
+        String LDAP_PROVIDER_URL = "ldapProviderUrl";
+        String LDAP_SECURITY_PROTOCOL = "ldapSecurityProtocol";
+        String LDAP_SECURITY_AUTHENTICATION = "ldapSecurityAuth";
         String LDAP_BIND_ACCOUNT_DN = "ldapBindAccountDn";
         String LDAP_BIND_ACCOUNT_PASSWORD = "ldapBindAccountPassword";
-    	String LDAP_USER_ROOT_DN = "ldapUserRootDn";
-    	String LDAP_AUTHORISED_GROUP_DN = "ldapAuthorisedGroupDn";
+        String LDAP_USER_ROOT_DN = "ldapUserRootDn";
+        String LDAP_AUTHORISED_GROUP_DN = "ldapAuthorisedGroupDn";
     }
 
-	private Hashtable<String, String> ldapEnv;
-	private String ldapBindAccountDn;
-	private String ldapBindAccountPassword;
-	private String ldapUserRootDn;
-	private String ldapAuthorisedGroupDn;
+    private Hashtable<String, String> ldapEnv;
+    private String ldapBindAccountDn;
+    private String ldapBindAccountPassword;
+    private String ldapUserRootDn;
+    private String ldapAuthorisedGroupDn;
 
     @Override
     public boolean requireAuthentication() {
@@ -65,17 +65,17 @@ public class LdapAuthenticator implements Authenticator {
                     LdapAuthenticator.class.getName()));
         }
         
-		this.ldapEnv = new Hashtable<>();
-		this.ldapEnv.put(Context.INITIAL_CONTEXT_FACTORY, getConfigValue(config, ConfigKeys.LDAP_INITIAL_CONTEXT_FACTORY));
-		this.ldapEnv.put(Context.PROVIDER_URL, getConfigValue(config, ConfigKeys.LDAP_PROVIDER_URL));
-		this.ldapEnv.put(Context.SECURITY_PROTOCOL, getConfigValue(config, ConfigKeys.LDAP_SECURITY_PROTOCOL));
-		this.ldapEnv.put(Context.SECURITY_AUTHENTICATION, getConfigValue(config, ConfigKeys.LDAP_SECURITY_AUTHENTICATION));
-		
-		this.ldapBindAccountDn = getConfigValue(config, ConfigKeys.LDAP_BIND_ACCOUNT_DN);	
-		this.ldapBindAccountPassword = getConfigValue(config, ConfigKeys.LDAP_BIND_ACCOUNT_PASSWORD);
+        this.ldapEnv = new Hashtable<>();
+        this.ldapEnv.put(Context.INITIAL_CONTEXT_FACTORY, getConfigValue(config, ConfigKeys.LDAP_INITIAL_CONTEXT_FACTORY));
+        this.ldapEnv.put(Context.PROVIDER_URL, getConfigValue(config, ConfigKeys.LDAP_PROVIDER_URL));
+        this.ldapEnv.put(Context.SECURITY_PROTOCOL, getConfigValue(config, ConfigKeys.LDAP_SECURITY_PROTOCOL));
+        this.ldapEnv.put(Context.SECURITY_AUTHENTICATION, getConfigValue(config, ConfigKeys.LDAP_SECURITY_AUTHENTICATION));
+        
+        this.ldapBindAccountDn = getConfigValue(config, ConfigKeys.LDAP_BIND_ACCOUNT_DN);   
+        this.ldapBindAccountPassword = getConfigValue(config, ConfigKeys.LDAP_BIND_ACCOUNT_PASSWORD);
 
-		this.ldapUserRootDn = getConfigValue(config, ConfigKeys.LDAP_USER_ROOT_DN);	
-		this.ldapAuthorisedGroupDn = getConfigValue(config, ConfigKeys.LDAP_AUTHORISED_GROUP_DN);	
+        this.ldapUserRootDn = getConfigValue(config, ConfigKeys.LDAP_USER_ROOT_DN); 
+        this.ldapAuthorisedGroupDn = getConfigValue(config, ConfigKeys.LDAP_AUTHORISED_GROUP_DN);   
     }
 
     @Override
@@ -90,81 +90,81 @@ public class LdapAuthenticator implements Authenticator {
         final String username = credentials.get(PROPERTY_USERNAME);
         final String password = credentials.get(PROPERTY_PASSWORD);
         
-		String userDn = "uid=" + username + "," + this.ldapUserRootDn;
+        String userDn = "uid=" + username + "," + this.ldapUserRootDn;
         logger.debug("Authenticating user {} using LDAP", username);
-		
+        
         // For authentication, use the username+password provided by the client to connect to LDAP
-		LdapContext ctx = null;
-		try {
-			ctx = this.createContext(userDn, password);
-		} catch (Exception ex) {
-			logger.debug("Authentication failed for user {} with error {}", userDn, ex.getLocalizedMessage());
-			throw new AuthenticationException("Username and/or password are incorrect");
-		} finally {
-			closeLdapContext(ctx);
-		}
-		logger.debug("Authentication successful for user {}", userDn);
-		
-		boolean isAuthorised = this.isAuthorised(userDn);
-		if (!isAuthorised) {
-			logger.debug("User {} does not belong to authorised group {}", userDn, this.ldapAuthorisedGroupDn);
-			throw new AuthenticationException("User does not belong to authorised group");
-		}
-		return new AuthenticatedUser(username);
+        LdapContext ctx = null;
+        try {
+            ctx = this.createContext(userDn, password);
+        } catch (Exception ex) {
+            logger.debug("Authentication failed for user {} with error {}", userDn, ex.getLocalizedMessage());
+            throw new AuthenticationException("Username and/or password are incorrect");
+        } finally {
+            closeLdapContext(ctx);
+        }
+        logger.debug("Authentication successful for user {}", userDn);
+        
+        boolean isAuthorised = this.isAuthorised(userDn);
+        if (!isAuthorised) {
+            logger.debug("User {} does not belong to authorised group {}", userDn, this.ldapAuthorisedGroupDn);
+            throw new AuthenticationException("User does not belong to authorised group");
+        }
+        return new AuthenticatedUser(username);
     }
     
-	private boolean isAuthorised(String userDn) throws AuthenticationException {
-		logger.debug("Checking if user {} belongs to authorised group {}", userDn, this.ldapAuthorisedGroupDn);
-		 // Where as for authorization, use the bind account to connect to LDAP
+    private boolean isAuthorised(String userDn) throws AuthenticationException {
+        logger.debug("Checking if user {} belongs to authorised group {}", userDn, this.ldapAuthorisedGroupDn);
+         // Where as for authorization, use the bind account to connect to LDAP
         LdapContext ctx = null;
-		try {
-	        ctx = this.createContext(this.ldapBindAccountDn, this.ldapBindAccountPassword);
-			ctx.setRequestControls(null);
-			NamingEnumeration<SearchResult> namingEnum 
-				= ctx.search(this.ldapAuthorisedGroupDn, "(&(member=" + userDn + ")(objectClass=groupOfNames))", newLdapSearchControls("cn"));
-			boolean isAuthorised = namingEnum.hasMore();
-			namingEnum.close();
-			return isAuthorised;
-		} catch (Exception ex) {
-			logger.error("Error looking up roles in LDAP", ex);
-			throw new AuthenticationException("Error looking up roles in LDAP", ex);
-		} finally {
-			closeLdapContext(ctx);
-		}
-	}
-	
-	private LdapContext createContext(String userDn, String password) throws NamingException {
-		Hashtable<String, String> authLdapEnv = new Hashtable<>(this.ldapEnv);
-		authLdapEnv.put(Context.SECURITY_PRINCIPAL, userDn);
-		authLdapEnv.put(Context.SECURITY_CREDENTIALS, password);
+        try {
+            ctx = this.createContext(this.ldapBindAccountDn, this.ldapBindAccountPassword);
+            ctx.setRequestControls(null);
+            NamingEnumeration<SearchResult> namingEnum 
+                = ctx.search(this.ldapAuthorisedGroupDn, "(&(member=" + userDn + ")(objectClass=groupOfNames))", newLdapSearchControls("cn"));
+            boolean isAuthorised = namingEnum.hasMore();
+            namingEnum.close();
+            return isAuthorised;
+        } catch (Exception ex) {
+            logger.error("Error looking up roles in LDAP", ex);
+            throw new AuthenticationException("Error looking up roles in LDAP", ex);
+        } finally {
+            closeLdapContext(ctx);
+        }
+    }
+    
+    private LdapContext createContext(String userDn, String password) throws NamingException {
+        Hashtable<String, String> authLdapEnv = new Hashtable<>(this.ldapEnv);
+        authLdapEnv.put(Context.SECURITY_PRINCIPAL, userDn);
+        authLdapEnv.put(Context.SECURITY_CREDENTIALS, password);
         return new InitialLdapContext(authLdapEnv, null);
-	}
-	
-	private static String getConfigValue(final Map<String,Object> config, String key) {
-		String value = (String)config.get(key);
-		if (value == null) {
-			throw new IllegalStateException(String.format("Authentication configuration missing the %s key", key));
-		}
+    }
+    
+    private static String getConfigValue(final Map<String,Object> config, String key) {
+        String value = (String)config.get(key);
+        if (value == null) {
+            throw new IllegalStateException(String.format("Authentication configuration missing the %s key", key));
+        }
         return value;
-	}
+    }
 
-	private static SearchControls newLdapSearchControls(String... attrs) {
-		SearchControls searchControls = new SearchControls();
-		searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-		searchControls.setTimeLimit(30000);
-		searchControls.setReturningAttributes(attrs);
-		return searchControls;
-	}
-	
-	private static void closeLdapContext(LdapContext ctx) {
-		if (ctx != null) {
-			try { 
-				ctx.close();
-			} catch (Exception ex) {
-				logger.warn("Error closing LDAP context", ex);
-			}
-		}	
-	}
+    private static SearchControls newLdapSearchControls(String... attrs) {
+        SearchControls searchControls = new SearchControls();
+        searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        searchControls.setTimeLimit(30000);
+        searchControls.setReturningAttributes(attrs);
+        return searchControls;
+    }
+    
+    private static void closeLdapContext(LdapContext ctx) {
+        if (ctx != null) {
+            try { 
+                ctx.close();
+            } catch (Exception ex) {
+                logger.warn("Error closing LDAP context", ex);
+            }
+        }   
+    }
 
     private class PlainTextSaslAuthenticator implements Authenticator.SaslNegotiator {
         private boolean complete = false;
