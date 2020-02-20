@@ -26,3 +26,5 @@ authentication: {
 }
 
 ```
+
+Also works with org.apache.tinkerpop.gremlin.server.handler.SaslAuthenticationHandler if using org.apache.tinkerpop.gremlin.server.channel.WebSocketChannelizer
